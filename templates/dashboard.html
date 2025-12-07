@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Movies Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial; }
+    canvas { max-width: 600px; height: 300px; }
+    .section { display: flex; align-items: flex-start; margin-bottom: 40px; }
+    .section > div { flex: 1; margin-right: 20px; }
+    .section .table-container { max-width: 400px; overflow-x: auto; }
+    .section .chart-container { flex: 2; }
+  </style>
+</head>
+<body>
+  <h1>Movies Dashboard from 2022 to 2024</h1>
+
+  <h2>1. Movies by Genre (Top 30)</h2>
+  <div class="section">
+    <div class="table-container">
+      <table border="1" cellpadding="5">
+        <tr><th>Genre</th><th>Count</th><th>Percentage</th></tr>
+        {% for row in data_genre_count %}
+        <tr><td>{{ row.category }}</td><td>{{ row.total_count }}</td><td>{{ row.percentage }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">No data.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div class="chart-container">
+      <canvas id="genreCountChart"></canvas>
+    </div>
+  </div>
+
+  <h2>2. Movies Per Year (with Cumulative Growth)</h2>
+  <div class="section">
+    <div class="table-container">
+      <table border="1" cellpadding="5">
+        <tr><th>Year</th><th>Count</th><th>Cumulative</th></tr>
+        {% for row in data_movies_year %}
+        <tr><td>{{ row.year }}</td><td>{{ row.total_count }}</td><td>{{ row.cumulative }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">No data.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div class="chart-container">
+      <canvas id="moviesYearChart"></canvas>
+    </div>
+  </div>
+
+  <h2>3. Top 10 Highest-Rated Movies (≥500k Votes)</h2>
+  <div class="section">
+    <div class="table-container">
+      <table border="1" cellpadding="5">
+        <tr><th>Title</th><th>Rating</th></tr>
+        {% for row in data_top_rated %}
+        <tr><td>{{ row.title }}</td><td>{{ row.rating }}</td></tr>
+        {% else %}
+        <tr><td colspan="2">No data.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div class="chart-container">
+      <canvas id="topRatedChart"></canvas>
+    </div>
+  </div>
+
+  <h2>4. Distribution of Movie Ratings</h2>
+  <div class="section">
+    <div class="table-container">
+      <table border="1" cellpadding="5">
+        <tr><th>Bucket</th><th>Count</th><th>Percentage</th></tr>
+        {% for row in data_rating_dist %}
+        <tr><td>{{ row.bucket }}</td><td>{{ row.count }}</td><td>{{ row.percentage }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">No data.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div class="chart-container">
+      <canvas id="ratingDistChart"></canvas>
+    </div>
+  </div>
+
+  <h2>5. Top 10 Directors by Avg Rating (Min 10 Movies)</h2>
+  <div class="section">
+    <div class="table-container">
+      <table border="1" cellpadding="5">
+        <tr><th>Director</th><th>Avg Rating</th></tr>
+        {% for row in data_top_directors %}
+        <tr><td>{{ row.name }}</td><td>{{ row.avg_rating }}</td></tr>
+        {% else %}
+        <tr><td colspan="2">No data.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div class="chart-container">
+      <canvas id="topDirectorsChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    // 1. Genre Count - Doughnut with percentage
+    const labelsGenreCount = {{ data_genre_count | map(attribute='category') | list | tojson }};
+    const valuesGenreCount = {{ data_genre_count | map(attribute='percentage') | list | tojson }};
+    new Chart(document.getElementById('genreCountChart').getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: labelsGenreCount, datasets: [{ label: 'Percentage', data: valuesGenreCount, backgroundColor: labelsGenreCount.map((_, i) => `hsl(${(i*55)%360}, 70%, 60%)`) }] },
+      options: { responsive: true }
+    });
+
+    // 2. Movies Per Year - Bar for annual, line for cumulative
+    const labelsYear = {{ data_movies_year | map(attribute='year') | list | tojson }};
+    const valuesYear = {{ data_movies_year | map(attribute='total_count') | list | tojson }};
+    const valuesCumulative = {{ data_movies_year | map(attribute='cumulative') | list | tojson }};
+    new Chart(document.getElementById('moviesYearChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labelsYear,
+        datasets: [
+          { type: 'bar', label: 'Annual Count', data: valuesYear, backgroundColor: 'rgba(75, 192, 192, 0.6)', yAxisID: 'y', barThickness: 20, order: 1 },
+          { type: 'line', label: 'Cumulative', data: valuesCumulative, borderColor: 'rgb(255, 99, 132)', borderWidth: 3, tension: 0.2, pointRadius: 0, yAxisID: 'y', order: 2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: {
+            ticks: {
+              autoSkip: true,
+              maxTicksLimit: 20
+            }
+          },
+          y: { min: 0, title: { display: true, text: 'Count / Cumulative' } }
+        }
+      }
+    });
+
+    // 3. Top Rated - Bar
+    const labelsTopRated = {{ data_top_rated | map(attribute='title') | list | tojson }};
+    const valuesTopRated = {{ data_top_rated | map(attribute='rating') | list | tojson }};
+    new Chart(document.getElementById('topRatedChart').getContext('2d'), {
+      type: 'bar',
+      data: { labels: labelsTopRated, datasets: [{ label: 'Rating', data: valuesTopRated, backgroundColor: 'rgba(153, 102, 255, 0.6)' }] },
+      options: { responsive: true, scales: { y: { beginAtZero: true, max: 10 } } }
+    });
+
+    // 4. Rating Distribution - Pie with percentage
+    const labelsRatingDist = {{ data_rating_dist | map(attribute='bucket') | list | tojson }};
+    const valuesRatingDist = {{ data_rating_dist | map(attribute='percentage') | list | tojson }};
+    new Chart(document.getElementById('ratingDistChart').getContext('2d'), {
+      type: 'pie',
+      data: { labels: labelsRatingDist, datasets: [{ label: 'Percentage', data: valuesRatingDist, backgroundColor: labelsRatingDist.map((_, i) => `hsl(${(i*72)%360}, 70%, 60%)`) }] },
+      options: { responsive: true }
+    });
+
+    // 5. Top Directors - Bar
+    const labelsDirectors = {{ data_top_directors | map(attribute='name') | list | tojson }};
+    const valuesDirectors = {{ data_top_directors | map(attribute='avg_rating') | list | tojson }};
+    new Chart(document.getElementById('topDirectorsChart').getContext('2d'), {
+      type: 'bar',
+      data: { labels: labelsDirectors, datasets: [{ label: 'Avg Rating', data: valuesDirectors, backgroundColor: 'rgba(255, 99, 132, 0.6)' }] },
+      options: { responsive: true, scales: { y: { beginAtZero: true, max: 10 } } }
+    });
+  </script>
+</body>
+</html>
